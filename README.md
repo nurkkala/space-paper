@@ -22,6 +22,7 @@ chip in both left corners, clear of the menu bar and the Dock.
 | `sheet` | Open a contact sheet of every palette in your browser |
 | `apply [WORDS...]` | Set each Space's wallpaper; with no words, follow the config |
 | `reset` | Put one picture — by default the macOS default — on every Space |
+| `watch` | Flash the Space's name on switching; `--install` to run at login |
 
 Words take an optional palette: `spacepaper make "Web=lagoon" "Code=clay"`.
 Without one, palettes are assigned by position in the order below.
@@ -271,6 +272,33 @@ each switch, because `osascript` exits 0 even when macOS drops the synthetic
 keystroke for want of Accessibility permission — without that check, every Space
 gets painted the last word and the run still claims success.
 
+## Flashing the Space name on switching
+
+The badge says which Space you are on; it cannot say where you *just landed*, since
+at the moment of switching the eye is still moving and the badge may be behind a
+window. `watch` flashes the name briefly, centred low on the display that changed.
+
+```
+spacepaper watch              # foreground, Ctrl-C to stop
+spacepaper watch --install    # register with launchd: starts at login
+spacepaper watch --status     # installed? loaded? running?
+spacepaper watch --uninstall  # stop it and forget it
+```
+
+It hangs off `NSWorkspaceActiveSpaceDidChangeNotification`, which is public API and
+fires for **every** route between Spaces — the Control-N hotkeys, a trackpad swipe,
+Mission Control, following a window. Watching the keyboard instead would catch only
+the hotkeys, and would need Accessibility permission to do it. The notification does
+not say *which* display changed, so that is worked out by diffing a remembered
+snapshot of each display's current Space against a fresh reading.
+
+Appearance options (`--hold`, `--fade`, `--scale`, `--font`) are recorded into the
+launchd plist by `--install`, so the agent flashes exactly as the command that
+installed it would have. The plist names the executable by absolute path, because
+launchd has none of your PATH or virtualenv — so moving or deleting the checkout
+breaks the agent until you re-run `--install`. Output goes to
+`~/Library/Logs/spacepaper.log`.
+
 ## Resetting
 
 ```
@@ -287,6 +315,24 @@ System Settings' "same on all Spaces" is **not** scriptable — System Events'
 belongs to WallpaperAgent. `reset` therefore does the equivalent the long way,
 walking each Space and setting the same file on each, which is
 indistinguishable once it lands.
+
+## Tests
+
+```
+uv run pytest                      # everything
+uv run pytest -m "not render"      # skip the Chrome renders (a tenth of a second)
+```
+
+Two tiers. Most are pure and instant; those marked `render` drive headless Chrome
+and take about half a minute. They are worth their weight for a specific reason:
+the layout guarantees here live in *pixels*, and the HTML has twice looked correct
+while the output was wrong — once when the field's overfill spilled back over the
+menu bar band, and once when a bottom-anchored badge moved between being measured
+and being screenshotted.
+
+The palette thresholds are asserted rather than merely documented, so an edit that
+weakens the separation, lightness spread, or word contrast fails the suite instead
+of quietly shipping.
 
 ## Known limitations
 

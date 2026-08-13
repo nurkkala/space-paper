@@ -40,26 +40,26 @@ class TestParseWordByPosition:
         assert got == ["sky", "meadow", "apricot", "blush"]
 
     def test_word_is_returned_unchanged(self):
-        assert parse_word("Athena", 1, BRIGHT_ORDER)[0] == "Athena"
+        assert parse_word("Beacon", 1, BRIGHT_ORDER)[0] == "Beacon"
 
     def test_surrounding_whitespace_is_trimmed(self):
-        assert parse_word("  Athena  ", 1, BRIGHT_ORDER)[0] == "Athena"
+        assert parse_word("  Beacon  ", 1, BRIGHT_ORDER)[0] == "Beacon"
 
 
 class TestParseWordExplicitPalette:
     def test_equals_form_overrides_position(self):
-        word, palette = parse_word("Athena=lagoon", 1, BRIGHT_ORDER)
-        assert (word, palette) == ("Athena", "lagoon")
+        word, palette = parse_word("Beacon=lagoon", 1, BRIGHT_ORDER)
+        assert (word, palette) == ("Beacon", "lagoon")
 
     def test_palette_may_come_from_the_other_family(self):
         """Names are unique across families, so this resolves without --set."""
-        assert parse_word("Athena=slate", 1, BRIGHT_ORDER)[1] == "slate"
+        assert parse_word("Beacon=slate", 1, BRIGHT_ORDER)[1] == "slate"
 
     def test_palette_name_is_case_insensitive(self):
-        assert parse_word("Athena=LAGOON", 1, BRIGHT_ORDER)[1] == "lagoon"
+        assert parse_word("Beacon=LAGOON", 1, BRIGHT_ORDER)[1] == "lagoon"
 
     def test_whitespace_around_the_equals_is_tolerated(self):
-        assert parse_word(" Athena = lagoon ", 1, BRIGHT_ORDER) == ("Athena", "lagoon")
+        assert parse_word(" Beacon = lagoon ", 1, BRIGHT_ORDER) == ("Beacon", "lagoon")
 
     def test_only_the_last_equals_separates(self):
         """rpartition, so a word may itself contain an equals sign."""
@@ -67,7 +67,7 @@ class TestParseWordExplicitPalette:
 
     def test_unknown_palette_is_a_usage_error(self):
         with pytest.raises(typer.BadParameter, match="unknown palette"):
-            parse_word("Athena=chartreuse", 1, BRIGHT_ORDER)
+            parse_word("Beacon=chartreuse", 1, BRIGHT_ORDER)
 
     def test_empty_word_is_a_usage_error(self):
         with pytest.raises(typer.BadParameter, match="word is empty"):
@@ -87,12 +87,12 @@ class TestRecoverWord:
         assert recover_word(Path("DefaultAerial.heic")) is None
 
     def test_ignores_names_whose_palette_is_unknown(self):
-        """Guards against `octavo-4k-...` style strays being read as words."""
-        assert recover_word(Path("octavo-4k-3840x2160.png")) is None
+        """Guards against `beacon-4k-...` style strays being read as words."""
+        assert recover_word(Path("beacon-4k-3840x2160.png")) is None
 
     def test_hyphenated_words_survive_the_round_trip(self):
         assert recover_word(Path("deep-work-sky-3840x2160.png")) == "Deep-work"
 
     def test_round_trips_with_the_name_apply_writes(self):
-        word, palette = parse_word("Athena", 5, BRIGHT_ORDER)
-        assert recover_word(Path(f"{word.lower()}-{palette}-3840x2160.png")) == "Athena"
+        word, palette = parse_word("Beacon", 5, BRIGHT_ORDER)
+        assert recover_word(Path(f"{word.lower()}-{palette}-3840x2160.png")) == "Beacon"

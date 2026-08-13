@@ -19,7 +19,7 @@ pytestmark = [pytest.mark.render, needs_chrome]
 
 WIDTH, HEIGHT = 1200, 800
 MENUBAR, DOCK = 24, 60
-WORD, PALETTE = "Athena", "meadow"
+WORD, PALETTE = "Beacon", "meadow"
 
 
 def rgb(color: str) -> tuple[int, int, int]:
@@ -32,7 +32,7 @@ def rendered(tmp_path_factory):
 
     target = tmp_path_factory.mktemp("render") / "wallpaper.png"
     shoot(
-        wallpaper_html(WORD, PALETTE, HEIGHT, menubar=MENUBAR, dock=DOCK, badge=True),
+        wallpaper_html(WORD, PALETTE, WIDTH, HEIGHT, menubar=MENUBAR, dock=DOCK, badge=True),
         target, WIDTH, HEIGHT,
     )
     return Image.open(target).convert("RGB")
@@ -44,7 +44,7 @@ def unbadged(tmp_path_factory):
 
     target = tmp_path_factory.mktemp("render") / "plain.png"
     shoot(
-        wallpaper_html(WORD, PALETTE, HEIGHT, menubar=MENUBAR, dock=DOCK, badge=False),
+        wallpaper_html(WORD, PALETTE, WIDTH, HEIGHT, menubar=MENUBAR, dock=DOCK, badge=False),
         target, WIDTH, HEIGHT,
     )
     return Image.open(target).convert("RGB")
@@ -105,7 +105,7 @@ class TestMenuBarBand:
 
         target = tmp_path / "noband.png"
         shoot(
-            wallpaper_html(WORD, PALETTE, HEIGHT, menubar=0, dock=DOCK, badge=False),
+            wallpaper_html(WORD, PALETTE, WIDTH, HEIGHT, menubar=0, dock=DOCK, badge=False),
             target, WIDTH, HEIGHT,
         )
         unbanded = first_lettered_row(Image.open(target).convert("RGB"))
@@ -114,8 +114,84 @@ class TestMenuBarBand:
             "the band is not what is holding it down"
         )
 
-    def test_the_band_pushes_lettering_to_exactly_its_edge(self, rendered):
-        assert first_lettered_row(rendered) == MENUBAR
+    def test_lettering_starts_at_the_band_and_not_far_below(self, rendered):
+        """A bound rather than an exact row.
+
+        Where the first glyph lands inside the band's edge depends on the type
+        metrics and how the rows happen to phase against the field height, so
+        pinning an exact value would assert an accident. What matters is that
+        nothing is above the band and the field is not pushed needlessly far down.
+        """
+        row = first_lettered_row(rendered)
+        pitch = (WIDTH / 8) * 0.1708 * 1.88  # one row of the brick rhythm
+        assert MENUBAR <= row <= MENUBAR + pitch, f"lettering starts at row {row}"
+
+
+class TestDockBand:
+    def test_the_dock_band_is_solid_ground(self, rendered):
+        """The Dock is drawn over the wallpaper, so lettering behind it only
+        fights the icons for legibility. Reserved exactly as the menu bar is."""
+        ground = rgb(PALETTES[PALETTE][0])
+        for y in range(HEIGHT - DOCK, HEIGHT):
+            for x in range(0, WIDTH, 3):
+                assert rendered.getpixel((x, y)) == ground, f"lettering at y={y}"
+
+    def test_lettering_reaches_up_to_the_dock_band(self, rendered):
+        ground = rgb(PALETTES[PALETTE][0])
+        strip = [
+            rendered.getpixel((x, y))
+            for y in range(HEIGHT - DOCK - 60, HEIGHT - DOCK)
+            for x in range(0, WIDTH, 3)
+        ]
+        assert any(p != ground for p in strip)
+
+
+class TestBadgeClearance:
+    """Words colliding with a badge are removed, not covered over.
+
+    Masking hides the middle of a glyph and leaves its extremities poking past the
+    edge -- stray partial letters floating beside the chip. Deleting the whole word
+    leaves nothing to peek, which is what these assert.
+    """
+
+    def chip_box(self, image, chip):
+        want = rgb(chip)
+        xs, ys = [], []
+        for y in range(0, image.size[1], 2):
+            for x in range(0, image.size[0] // 2, 2):
+                if image.getpixel((x, y)) == want:
+                    xs.append(x)
+                    ys.append(y)
+        assert xs, "no chip found"
+        return min(xs), min(ys), max(xs), max(ys)
+
+    @pytest.mark.parametrize("half", ["top", "bottom"])
+    def test_no_word_pixels_survive_near_a_badge(self, rendered, half):
+        chip, _ = chip_colors(*PALETTES[PALETTE])
+        word_color = rgb(PALETTES[PALETTE][1])
+        top = MENUBAR if half == "top" else HEIGHT // 2
+        bottom = HEIGHT // 2 if half == "top" else HEIGHT - DOCK
+        region = rendered.crop((0, top, WIDTH // 3, bottom))
+
+        left, up, right, down = self.chip_box(region, chip)
+
+        # The outline is antialiased against the chip, and somewhere along that ramp
+        # a pixel lands on exactly the word color. Those sit hard against the pill,
+        # so the ring being examined starts outside them: a surviving letter would
+        # be a solid cluster further out, not a lone pixel on the border.
+        skin, margin = 5, 16
+        width, height = region.size
+        strays = [
+            (x, y)
+            for y in range(max(0, up - margin), min(height, down + margin))
+            for x in range(max(0, left - margin), min(width, right + margin))
+            if not (left - skin <= x <= right + skin and up - skin <= y <= down + skin)
+            and region.getpixel((x, y)) == word_color
+        ]
+        assert not strays, (
+            f"{len(strays)} word pixels beside the badge, e.g. {strays[:4]} -- "
+            "a word that should have been suppressed is peeking out"
+        )
 
 
 class TestBadges:
@@ -157,7 +233,7 @@ class TestPalettesRender:
 
         target = tmp_path / f"{name}.png"
         shoot(
-            wallpaper_html("Word", name, 400, menubar=10, dock=20, badge=False),
+            wallpaper_html("Word", name, 400, 400, menubar=10, dock=20, badge=False),
             target, 400, 400,
         )
         image = Image.open(target).convert("RGB")

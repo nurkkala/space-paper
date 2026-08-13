@@ -133,21 +133,49 @@ function fill(el, word, cols, tracking) {
     }
   }
 }
+
+// Remove whole words that would collide with a badge, rather than covering them
+// over. A mask hides the middle of a glyph but leaves its extremities poking out
+// past the edge; deleting the word means there is nothing left to peek. Measured
+// from the badges' own boxes, so it stays correct whatever their size.
+function suppress(badges, margin) {
+  const zones = Array.from(badges, b => {
+    const r = b.getBoundingClientRect();
+    return {l: r.left - margin, t: r.top - margin, r: r.right + margin, b: r.bottom + margin};
+  });
+  document.querySelectorAll('#field .w').forEach(w => {
+    const r = w.getBoundingClientRect();
+    if (zones.some(z => r.left < z.r && r.right > z.l && r.top < z.b && r.bottom > z.t)) {
+      w.remove();
+    }
+  });
+}
 """
 
 WALLPAPER_HTML = Template("""<!doctype html>
 <meta charset="utf-8"><title>$word</title>
 <style>
   * { margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; background: $ground; overflow: hidden; }
-  /* The field stops short of the menu bar rather than running under it. Lettering
-     behind the menu bar fights the menu titles for legibility, and the bar cannot
-     be moved -- so the wallpaper yields, leaving a clean band of ground behind it. */
+  /* Pinned to the exact output size rather than 100%. Headless Chrome runs page
+     scripts in a viewport that is not yet the requested size and resizes afterwards,
+     which silently moved every bottom-anchored element between measurement and
+     screenshot -- so the badge landed clear of the words that had been deleted to
+     make room for it. Explicit pixels make the geometry independent of when the
+     viewport settles. */
+  html { width: ${width}px; height: ${height}px; }
+  /* `position: relative` is the load-bearing part: without a positioned ancestor,
+     absolutely positioned children resolve against the viewport, not this box. */
+  body { position: relative; width: ${width}px; height: ${height}px;
+         background: $ground; overflow: hidden; }
+  /* The field stops short of the menu bar and the Dock rather than running under
+     either. Lettering behind them fights the menu titles and the icons for
+     legibility, and neither bar can be moved -- so the wallpaper yields, leaving a
+     clean band of ground behind each. */
   #field {
-    position: absolute; top: ${menubar}px; left: 0; right: 0; bottom: 0;
+    position: absolute; top: ${menubar}px; left: 0; right: 0; bottom: ${dock}px;
     /* The field deliberately overfills its box on every side so the brick offset
        bleeds off the edges; without clipping, that overfill spills back over the
-       menu bar band and undoes the point of reserving it. */
+       reserved bands and undoes the point of them. */
     overflow: hidden;
     font-family: "$font", serif; font-variant-caps: small-caps;
     color: $wordcolor; -webkit-font-smoothing: antialiased;
@@ -184,6 +212,7 @@ $badge_html
 <script>
 $fill_js
 fill(document.getElementById('field'), "$word", $cols, $tracking);
+suppress(document.querySelectorAll('.badge'), $badge_clearance);
 </script>
 """)
 
@@ -276,6 +305,7 @@ def chip_colors(ground: str, word: str) -> tuple[str, str]:
 def wallpaper_html(
     word: str,
     palette: str,
+    width: int,
     height: int,
     *,
     contrast: float = 1.0,
@@ -309,12 +339,15 @@ def wallpaper_html(
     return WALLPAPER_HTML.substitute(
         word=word,
         ground=ground,
+        width=width,
+        height=height,
         wordcolor=mix(ground, full, contrast),
         font=font,
         cols=cols,
         tracking=tracking,
         fill_js=FILL_JS,
         menubar=menubar,
+        dock=dock,
         chip=chip,
         chiptext=chiptext,
         badge_html=chip_html,
@@ -323,6 +356,7 @@ def wallpaper_html(
         badge_pad=round(badge_height * 0.42),
         badge_radius=round(badge_height / 2),
         badge_border=max(2, round(badge_height * 0.035)),
+        badge_clearance=round(badge_height * 0.30),
         badge_top=menubar + gap,
         badge_bottom=dock + gap,
         badge_left=round(badge_height * 0.55),
@@ -417,7 +451,7 @@ def make(
         target = out / f"{word.lower()}-{palette}-{width}x{height}.png"
         shoot(
             wallpaper_html(
-                word, palette, height, contrast=contrast, menubar=screen.menubar,
+                word, palette, width, height, contrast=contrast, menubar=screen.menubar,
                 dock=screen.dock, badge=badge, cols=cols, tracking=tracking, font=font,
             ),
             target, width, height,
@@ -741,7 +775,7 @@ def paint(
                 continue
             shoot(
                 wallpaper_html(
-                    word, palette, height, contrast=contrast, menubar=screen.menubar,
+                    word, palette, width, height, contrast=contrast, menubar=screen.menubar,
                     dock=screen.dock, badge=badge,
                 ),
                 target, width, height,
@@ -915,6 +949,180 @@ def config(
             typer.echo(f"    set   {screen.palette_set}")
         if screen.badge is not None:
             typer.echo(f"    badge {screen.badge}")
+
+
+def word_for(screen: dsp.Display, space: int, loaded: cfg.Config | None) -> tuple[str, str] | None:
+    """The word and palette configured for one Space, or None if none is.
+
+    Falls back to the word already on that Space's wallpaper, so `watch` still says
+    something useful before a config exists -- the file names carry the answer.
+    """
+    entry = None
+    if loaded:
+        for candidate in loaded.screens:
+            try:
+                if dsp.resolve(candidate.match).cg_id == screen.cg_id:
+                    entry = candidate
+                    break
+            except dsp.DisplayError:
+                continue
+
+    if entry and entry.words:
+        if space <= len(entry.words):
+            family = entry.palette_set or loaded.palette_set
+            return parse_word(entry.words[space - 1], space, rotation(family))
+        return None
+
+    current = next((s for s in screen.spaces if s.number == space), None)
+    word = recover_word(current.picture if current else None)
+    if not word:
+        return None
+    palette = current.picture.stem.split("-")[-2]
+    return word, palette
+
+
+def agent_status() -> None:
+    """Report whether the login agent is installed, loaded, and running."""
+    from . import agent
+
+    typer.echo(f"plist    {agent.plist_path()}")
+    typer.echo(f"installed {agent.is_installed()}")
+    if not agent.is_installed():
+        typer.echo("\nNot set up. Install it with:  spacepaper watch --install")
+        return
+    typer.echo(f"loaded    {agent.is_loaded()}")
+    running = agent.pid()
+    typer.echo(f"running   {'yes, pid ' + str(running) if running else 'no'}")
+    typer.echo(f"log       {agent.LOG}")
+
+
+def agent_install(options: list[str]) -> None:
+    """Write the agent definition and start it, replacing any earlier one."""
+    from . import agent
+
+    try:
+        target = agent.write_plist(options)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    if agent.is_loaded():
+        agent.unload()
+    result = agent.load()
+    if result.returncode != 0:
+        typer.echo(f"Wrote {target}, but launchctl refused it:", err=True)
+        typer.echo(f"  {result.stderr.strip() or result.stdout.strip()}", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"Installed {target}")
+    typer.echo(f"Running now, and at every login. Log: {agent.LOG}")
+    typer.echo("Stop it with:  spacepaper watch --uninstall")
+
+
+def agent_uninstall() -> None:
+    """Stop the agent and forget it."""
+    from . import agent
+
+    if not agent.is_installed() and not agent.is_loaded():
+        typer.echo("Not installed; nothing to remove.")
+        return
+    if agent.is_loaded():
+        result = agent.unload()
+        if result.returncode != 0:
+            typer.echo(f"launchctl: {result.stderr.strip()}", err=True)
+    agent.remove()
+    typer.echo("Removed. The watcher will not start at login.")
+
+
+@app.command()
+def watch(
+    install: Annotated[
+        bool, typer.Option(help="Install as a login agent and start it.")
+    ] = False,
+    uninstall: Annotated[
+        bool, typer.Option(help="Stop the login agent and remove it.")
+    ] = False,
+    status: Annotated[
+        bool, typer.Option(help="Report whether the login agent is set up and running.")
+    ] = False,
+    hold: Annotated[float, typer.Option(help="Seconds to hold the name before fading.")] = 0.8,
+    fade: Annotated[float, typer.Option(help="Seconds the fade-out takes.")] = 0.35,
+    scale: Annotated[float, typer.Option(help="Size multiplier for the flashed chip.")] = 1.0,
+    font: Annotated[str, typer.Option(help="Font family.")] = "Hoefler Text",
+) -> None:
+    """Flash the Space's name whenever the active Space changes.
+
+    Run bare, it watches in the foreground until Ctrl-C. That is the wrong lifetime
+    for everyday use, so --install registers it with launchd instead: started at
+    login, restarted if it dies, and stopped only by --uninstall. --status says
+    which of those is true right now.
+
+    Answers "where did I just land", which the wallpaper badge cannot: at the moment
+    of switching, the eye is still moving and the badge may be behind a window.
+
+    Driven by a public workspace notification rather than by watching the keyboard,
+    so it catches every route between Spaces -- the Control-N hotkeys, a trackpad
+    swipe, Mission Control, or following a window -- and needs no Accessibility
+    permission to do it.
+    """
+    if sum([install, uninstall, status]) > 1:
+        raise typer.BadParameter("choose only one of --install, --uninstall, --status")
+    if status:
+        return agent_status()
+    if uninstall:
+        return agent_uninstall()
+    if install:
+        # Carry the appearance options into the plist, so the agent flashes exactly
+        # as the command that installed it would have.
+        options = []
+        for name, value, default in [
+            ("--hold", hold, 0.8), ("--fade", fade, 0.35),
+            ("--scale", scale, 1.0), ("--font", font, "Hoefler Text"),
+        ]:
+            if value != default:
+                options += [name, str(value)]
+        return agent_install(options)
+
+    from . import flash
+
+    try:
+        loaded = cfg.load() if cfg.exists() else None
+    except cfg.ConfigError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    overlay = flash.Overlay(font=font, scale=scale)
+    state = {"spaces": flash.snapshot()}
+
+    def on_change() -> None:
+        screens = dsp.displays()
+        for landing in flash.landings(state["spaces"], screens):
+            found = word_for(landing.display, landing.space, loaded)
+            if not found:
+                continue
+            word, palette = found
+            ground, full = PALETTES[palette]
+            chip, text = chip_colors(ground, full)
+            target = flash.screen_for(landing.display.cg_id)
+            if target is not None:
+                overlay.show(word, chip, text, target, hold, fade)
+        state["spaces"] = {s.uuid: s.current_space for s in screens}
+
+    app_kit = flash.NSApplication.sharedApplication()
+    app_kit.setActivationPolicy_(flash.NSApplicationActivationPolicyAccessory)
+    watcher = flash.Watcher.alloc().initWithFlasher_(on_change)
+    flash.NSWorkspace.sharedWorkspace().notificationCenter().addObserver_selector_name_object_(
+        watcher, b"spaceChanged:", flash.NSWorkspaceActiveSpaceDidChangeNotification, None
+    )
+
+    typer.echo(f"Watching {len(state['spaces'])} display(s). Ctrl-C to stop.")
+
+    # A no-op timer keeps the Cocoa run loop returning to Python often enough for
+    # Ctrl-C to be delivered; without it the interpreter never gets a slice and the
+    # signal sits unhandled until something else wakes the loop.
+    flash.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(0.25, True, lambda t: None)
+    try:
+        app_kit.run()
+    except KeyboardInterrupt:
+        typer.echo("\nStopped.")
 
 
 @app.command()

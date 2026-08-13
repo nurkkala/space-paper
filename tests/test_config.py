@@ -71,7 +71,7 @@ class TestRoundTrip:
         assert cfg.path().is_file()
 
     @pytest.mark.parametrize("name", [
-        "DELL U2720Q", 'Odd "Quoted" Display', "Back\\slash", "Built-in Retina Display",
+        "ACME 27", 'Odd "Quoted" Display', "Back\\slash", "Built-in Retina Display",
     ])
     def test_display_names_needing_escapes_round_trip(self, config_home, name):
         cfg.save(cfg.Config(screens=[cfg.Screen(match=name, words=["X"])]))

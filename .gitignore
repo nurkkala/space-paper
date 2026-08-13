@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Rendered output. Nothing here is meant to be committed: wallpapers are
+# regenerated from `make`, and their file names carry Space names.
+*.png

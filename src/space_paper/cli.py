@@ -168,6 +168,10 @@ WALLPAPER_HTML = Template("""<!doctype html>
     height: ${badge_height}px; padding: 0 ${badge_pad}px;
     border-radius: ${badge_radius}px;
     background: $chip; color: $chiptext;
+    /* A hairline so the chip has an edge on *any* ground. Lightness alone cannot
+       carry it: on an already-light ground such as stone or butter, a near-white
+       chip has nowhere left to go and dissolves into its background. */
+    border: ${badge_border}px solid $chiptext;
     font-family: "$font", serif; font-variant-caps: small-caps;
     font-size: ${badge_size}px; letter-spacing: ${badge_track}em;
     line-height: 1; white-space: nowrap; -webkit-font-smoothing: antialiased;
@@ -318,6 +322,7 @@ def wallpaper_html(
         badge_size=round(band * 0.40),
         badge_pad=round(badge_height * 0.42),
         badge_radius=round(badge_height / 2),
+        badge_border=max(2, round(badge_height * 0.035)),
         badge_top=menubar + gap,
         badge_bottom=dock + gap,
         badge_left=round(badge_height * 0.55),

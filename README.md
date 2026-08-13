@@ -1,4 +1,4 @@
-# space-wallpaper
+# space-paper
 
 Give every macOS Space its own wallpaper — a single word repeated in a
 brick-offset grid, each Space in its own color — so a glance at the desktop tells

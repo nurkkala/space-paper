@@ -9,3 +9,6 @@ build/
 # Rendered output. Nothing here is meant to be committed: wallpapers are
 # regenerated from `make`, and their file names carry Space names.
 *.png
+
+# Machine-local session note, written by the clock-out/checkpoint rituals.
+.resume.md

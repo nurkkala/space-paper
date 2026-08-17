@@ -8,6 +8,8 @@ design?") rather than a bug report.
 """
 
 import itertools
+import re
+from pathlib import Path
 
 import pytest
 
@@ -94,3 +96,52 @@ class TestBothFamilies:
         worst = min(separation(DARK, a, b) for a, b in pairs(DARK))
         assert worst < MIN_SEPARATION
         assert list(PALETTE_SETS)[0] == "bright"
+
+
+# The README restates the palettes -- every hex value, in order, plus the figures the
+# "Why bright" argument turns on. Those are hand-copies of what the code and this
+# file's colorimetry produce, and a hand-copy drifts silently the first time a color
+# is tuned. So the document is checked against the source, not trusted.
+
+README = Path(__file__).resolve().parents[1] / "README.md"
+
+
+def readme_section(heading: str) -> str:
+    """The text under one `###` heading, up to the next heading of any level."""
+    text = README.read_text()
+    start = text.index(f"\n### {heading}\n")
+    match = re.search(r"\n#{1,3} ", text[start + 1:])
+    return text[start:] if match is None else text[start:start + 1 + match.start()]
+
+
+def readme_palette_table(heading: str) -> dict[str, tuple[str, str]]:
+    rows = re.findall(r"^\| `(\w+)` \| `(#[0-9A-F]{6})` \| `(#[0-9A-F]{6})` \|", readme_section(heading), re.M)
+    return {name: (ground, word) for name, ground, word in rows}
+
+
+class TestReadmeAgreesWithTheCode:
+    @pytest.mark.parametrize("heading, family", [("`bright` (default)", BRIGHT), ("`dark`", DARK)])
+    def test_palette_table_matches_in_value_and_order(self, heading, family):
+        """Order is part of the design: palettes are assigned by position."""
+        documented = readme_palette_table(heading)
+        assert list(documented) == list(family), "README lists the palettes in a different order"
+        assert documented == family, "README hex values differ from the code"
+
+    @pytest.mark.parametrize("name, family", [("dark", DARK), ("bright", BRIGHT)])
+    def test_lightness_range_and_closest_pair_match(self, name, family):
+        section = readme_section("Why `bright` is the default")
+        row = re.search(rf"^\| `{name}` \| ([\d.]+) \| ([\d.]+) — `(\w+)` / `(\w+)` \|", section, re.M)
+        assert row, f"no summary row for {name}"
+        spread = max(lightness(g) for g, _ in family.values()) - min(lightness(g) for g, _ in family.values())
+        closest = min((separation(family, a, b), a, b) for a, b in pairs(family))
+        assert float(row[1]) == round(spread, 1)
+        assert float(row[2]) == round(closest[0], 1)
+        assert {row[3], row[4]} == {closest[1], closest[2]}
+
+    def test_worst_pair_among_the_first_four_matches(self):
+        section = readme_section("Why `bright` is the default")
+        quoted = re.search(r"worst pair ΔE (\d+)", section)
+        assert quoted, "README no longer quotes the worst first-four pair"
+        first = list(BRIGHT)[:FIRST_N]
+        worst = min(separation(BRIGHT, a, b) for a, b in pairs(first))
+        assert int(quoted[1]) == round(worst)

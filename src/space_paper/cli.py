@@ -2,12 +2,16 @@
 each Space in its own calm hue, so the active desktop is identifiable at a glance.
 And when you switch Spaces, flash the name of the one you have just reached.
 
+Everyday use:
+
     spacepaper status                              # displays, Spaces, current wallpaper
     spacepaper config --init                       # record which words go where
     spacepaper apply                               # render what is missing, then set
     spacepaper watch --install                     # flash the Space's name on switching
     spacepaper sheet                               # palette contact sheet, in a browser
     spacepaper reset                               # every Space back to the macOS default
+
+More examples:
 
     spacepaper make Code Write Mail Web            # render the PNGs
     spacepaper apply --display external --dry-run Code Write Mail Web
@@ -20,15 +24,16 @@ Text's AAT small caps -- real .small glyphs rather than scaled capitals. Pillow'
 FreeType path cannot reach them without a libraqm build, and Hoefler Text has no
 OpenType GSUB table for a non-Apple shaper to read.
 
-With words given, `apply` paints one display, named by `--display`: `main`,
-`builtin`, `external`, an index from `status`, or any part of the display's name.
-With no words it follows the config, which may cover several displays. Either way
-it writes `desktop id N`, so no screen it was not asked about is touched.
+With words given, `apply` paints one display, chosen by `--display`: `main`,
+`builtin`, `external`, a position in the `status` listing, or any part of the
+display's name. With no words it follows the config, which may cover several
+displays. Either way it writes `desktop id N`, so no screen it was not asked
+about is touched.
 
 It switches to each Space with its Mission Control hotkey and sets the picture
 there, because AppleScript writes only the *active* Space. That needs "Switch to
 Desktop N" enabled in System Settings > Keyboard > Keyboard Shortcuts > Mission
-Control, and Accessibility permission for the terminal running it.
+Control, and Accessibility permission for the terminal that runs it.
 """
 
 import shutil
@@ -480,9 +485,9 @@ def sheet(
 ) -> None:
     """Show a contact sheet of every palette, for choosing between them.
 
-    Opens in the browser rather than writing a file: the sheet is something to look
-    at while deciding, not an artifact to keep, and it has no business sitting in a
-    wallpapers directory next to the real output. It is already HTML, so the
+    Opens in the browser rather than writing a file: the sheet is something to
+    consult while deciding, not an artifact to keep, and it has no business sitting
+    in a wallpapers directory next to the real output. It is already HTML, so the
     headless-Chrome round trip that the wallpapers need buys nothing here.
     """
     if palette_set != "all" and palette_set not in PALETTE_SETS:
@@ -637,8 +642,8 @@ def status(
 ) -> None:
     """Show every display, its Spaces, and the wallpaper each one carries.
 
-    A Space marked `inherits global` has never been given a picture of its own, so
-    it follows the system-wide wallpaper. `*` marks the Space active right now on
+    A Space marked `inherits global` has never had a picture of its own, so it
+    follows the system-wide wallpaper. `*` marks the Space active right now on
     that display -- one per screen, since each display has its own current Space.
     """
     found = [pick(display)] if display else dsp.displays()
@@ -699,18 +704,18 @@ def apply(
 ) -> None:
     """Set each Space's wallpaper, one Space at a time.
 
-    With words given, one display is painted -- whichever --display names, or the
-    main one. With no words the config decides, which may cover several displays;
-    any it lists with an empty word list is passed over untouched.
+    With words given, `apply` paints one display: the one --display selects, or the
+    main one. With no words the config decides, which may cover several displays,
+    and any it lists with an empty word list stays untouched.
 
-    Only displays actually chosen are written: the picture goes to `desktop id N`,
-    never to `every desktop`, so other screens keep what they have. Switching to each
-    Space with its Mission Control hotkey is still necessary, because AppleScript
-    writes only the *active* Space.
+    Only the chosen displays are written; the picture goes to `desktop id N`, never
+    to `every desktop`, so other screens keep what they have. It still has to switch
+    to each Space with its Mission Control hotkey, because AppleScript writes only
+    the *active* Space.
 
     Requires "Switch to Desktop N" enabled in System Settings > Keyboard >
     Keyboard Shortcuts > Mission Control, and Accessibility permission for the
-    terminal running this. Turn OFF "Automatically rearrange Spaces based on most
+    terminal that runs it. Turn OFF "Automatically rearrange Spaces based on most
     recent use", or Space numbering drifts under you.
     """
     for screen, plan_words, plan_set, plan_badge in build_plan(words, display, palette_set, badge):
@@ -1147,8 +1152,8 @@ def reset(
 
     System Settings' "same on all Spaces" is not scriptable: System Events' desktop
     class exposes no such property, and the underlying `Linked` state belongs to
-    WallpaperAgent. So this does the equivalent the long way, walking each Space and
-    setting the same file on each, which is indistinguishable once it lands.
+    WallpaperAgent. So this does the equivalent the long way: it walks each Space
+    and sets the same file on each, which is indistinguishable on screen.
 
     The default picture follows /System/Library/CoreServices/DefaultDesktop.heic,
     the symlink macOS repoints on each release, so this keeps working after upgrades.

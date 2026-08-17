@@ -85,7 +85,6 @@ class TestGoto:
     def test_uses_the_control_hotkey_for_the_requested_space(self, monkeypatch, external):
         captured = []
         monkeypatch.setattr(cli, "osascript", lambda s: captured.append(s) or Result())
-        monkeypatch.setattr(cli.dsp, "focus", lambda screen: None)
         monkeypatch.setattr(cli.dsp, "resolve", lambda uuid: external)
         cli.goto(external, 1, settle=0)
         assert f"key code {cli.KEY_CODES[1]}" in captured[0]

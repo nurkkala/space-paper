@@ -60,7 +60,6 @@ _cg.CGDisplayModeGetPixelWidth.restype = ctypes.c_size_t
 _cg.CGDisplayModeGetPixelWidth.argtypes = [ctypes.c_void_p]
 _cg.CGDisplayModeGetPixelHeight.restype = ctypes.c_size_t
 _cg.CGDisplayModeGetPixelHeight.argtypes = [ctypes.c_void_p]
-_cg.CGWarpMouseCursorPosition.argtypes = [_CGPoint]
 
 _UTF8 = 0x08000100
 _BINARY_PLIST = 200
@@ -120,11 +119,6 @@ class Display:
     def label(self) -> str:
         tags = [self.kind] + (["main"] if self.main else [])
         return f"{self.name} ({', '.join(tags)})"
-
-    @property
-    def center(self) -> tuple[float, float]:
-        x, y, w, h = self.bounds
-        return x + w / 2, y + h / 2
 
     @property
     def current_space(self) -> int:
@@ -454,15 +448,3 @@ def resolve(selector: str, among: list[Display] | None = None) -> Display:
         names = ", ".join(d.name for d in matches)
         raise DisplayError(f"{selector!r} is ambiguous -- matches {names}. Available: {catalog}")
     return matches[0]
-
-
-def focus(display: Display) -> None:
-    """Park the pointer on a display so the Mission Control hotkeys act on it.
-
-    With "Displays have separate Spaces" on, Control-N switches the Space of the
-    focused screen. Without this the keystroke lands on whichever display the
-    pointer happened to be over, which is how a run aimed at one screen ends up
-    paging another.
-    """
-    x, y = display.center
-    _cg.CGWarpMouseCursorPosition(_CGPoint(x, y))

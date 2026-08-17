@@ -212,9 +212,7 @@ each Space currently carries. Writing goes through the supported AppleScript API
 which has one useful property: `set picture` affects only the *currently active*
 Space. So `apply` switches to each Space in turn and sets the picture there.
 
-Two smaller details keep a run honest. `apply` warps the pointer onto the target
-screen before each Control-N, because with "Displays have separate Spaces" the
-hotkey pages whichever display has focus. And it re-reads the Space layout after
+One smaller detail keeps a run honest. `apply` re-reads the Space layout after
 each switch, because `osascript` exits 0 even when macOS drops the synthetic
 keystroke for want of Accessibility permission — without that check, every Space
 gets painted the last word and the run still claims success.

@@ -108,10 +108,6 @@ class TestDisplayProperties:
         screen = make_display(spaces=0)
         assert screen.current_space == 0
 
-    def test_center_is_the_middle_of_the_bounds(self):
-        screen = make_display(width=3840, height=2160)  # bounds are half, in points
-        assert screen.center == (960.0, 540.0)
-
 
 class TestPictureExtraction:
     """Reading each Space's wallpaper out of the store's nested plist nodes."""

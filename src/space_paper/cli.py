@@ -536,9 +536,9 @@ def pick(selector: str) -> dsp.Display:
 def goto(screen: dsp.Display, space: int, settle: float = SETTLE) -> None:
     """Switch one display to one of its Spaces, or explain why it did not move.
 
-    The pointer is parked on the target screen first: with "Displays have separate
-    Spaces" on, Control-N pages whichever display has focus, so without this a run
-    aimed at one screen quietly pages another.
+    With "Displays have separate Spaces" on, Control-N pages the display that holds
+    keyboard focus -- not the one under the pointer, which is why the frontmost
+    window has to be on the target display and why nothing here moves the pointer.
 
     osascript exits 0 even when macOS drops the synthetic key for want of
     Accessibility permission, so the Space layout is re-read rather than trusted.
@@ -550,7 +550,6 @@ def goto(screen: dsp.Display, space: int, settle: float = SETTLE) -> None:
     if len(screen.spaces) < 2:
         return
 
-    dsp.focus(screen)
     osascript(
         f'tell application "System Events" to key code {KEY_CODES[space]} using control down'
     )
@@ -606,7 +605,6 @@ def go_home(screen: dsp.Display, home: int, settle: float = SETTLE) -> None:
     the user is actually looking at rather than the one they just left.
     """
     if home and home in KEY_CODES and len(screen.spaces) > 1:
-        dsp.focus(screen)
         osascript(
             f'tell application "System Events" to key code {KEY_CODES[home]} using control down'
         )

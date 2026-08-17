@@ -1,7 +1,7 @@
 [project]
 name = "space-paper"
 version = "0.1.0"
-description = "Give every macOS Space its own wallpaper, so the active desktop is identifiable at a glance"
+description = "Give every macOS Space its own wallpaper and flash its name when you switch, so the active desktop is identifiable at a glance"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["typer>=0.12", "pyobjc-framework-Cocoa>=10.0"]

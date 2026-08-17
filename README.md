@@ -2,15 +2,25 @@
 
 Give every macOS Space its own wallpaper — a single word repeated in a
 brick-offset grid, each Space in its own color — so a glance at the desktop tells
-you which Space you are on.
+you which Space you are on. And when you switch Spaces, flash the name of the one
+you have just reached.
 
 ```
 spacepaper config --init      # record which words go on which display
 spacepaper apply              # render anything missing, then set every Space
+spacepaper watch --install    # flash the Space's name whenever you switch
 ```
 
 Each wallpaper reserves a clean band behind the menu bar, and names the Space on a
 chip in both left corners, clear of the menu bar and the Dock.
+
+The flash is that same chip, larger and centered low on the display that changed;
+it stays for about a second, then fades. Where the badge says which Space you are
+on, the flash says where you have just arrived, at the moment when the eye is still
+moving and the badge may be behind a window. Every route between Spaces triggers it
+(hotkey, swipe, Mission Control, following a window), and it needs no Accessibility
+permission to notice them. `watch --install` keeps it running from login onward.
+Details under [Flashing the Space name on switching](#flashing-the-space-name-on-switching).
 
 ## Commands
 
@@ -73,6 +83,8 @@ Everything specific to a machine is written outside the repo:
 | Your display/word assignments | `~/.config/spacepaper/config.toml` |
 | The rendered wallpapers | `~/Pictures/Wallpapers/` |
 | The palette contact sheet | a temporary directory, discarded by the OS |
+| The `watch` login agent | `~/Library/LaunchAgents/com.spacepaper.watch.plist` |
+| The watcher's log | `~/Library/Logs/spacepaper.log` |
 
 If you fork this, the one thing to watch is documentation: examples naming your
 own monitor or Spaces are the realistic way details leak into a public repo.
@@ -276,7 +288,10 @@ gets painted the last word and the run still claims success.
 
 The badge says which Space you are on; it cannot say where you *just landed*, since
 at the moment of switching the eye is still moving and the badge may be behind a
-window. `watch` flashes the name briefly, centred low on the display that changed.
+window. `watch` flashes the name briefly on the badge's own chip, in that Space's
+colors, centered low on the display that changed. The word comes from the config,
+or failing that from the file name of the wallpaper already on that Space, so the
+flash works before any config exists. A Space with neither says nothing.
 
 ```
 spacepaper watch              # foreground, Ctrl-C to stop
@@ -315,6 +330,54 @@ System Settings' "same on all Spaces" is **not** scriptable — System Events'
 belongs to WallpaperAgent. `reset` therefore does the equivalent the long way,
 walking each Space and setting the same file on each, which is
 indistinguishable once it lands.
+
+## Uninstalling
+
+Everything the tool changed can be put back with the tool itself, except the macOS
+settings you changed by hand to let it run and one piece of wallpaper state that
+only System Settings can restore. The tool wrote nothing else: there is no state
+file, and it only ever reads the wallpaper store, `com.apple.spaces`, and SkyLight.
+Take the steps in the order below, because each one needs something a later one
+removes.
+
+1. **Stop the watcher.** `spacepaper watch --uninstall` boots the login agent out
+   of launchd and deletes its plist. Do this while the checkout still exists: the
+   plist names the executable by absolute path, so once that binary is gone, do
+   the equivalent by hand:
+
+   ```
+   launchctl bootout gui/$(id -u)/com.spacepaper.watch
+   rm ~/Library/LaunchAgents/com.spacepaper.watch.plist
+   ```
+
+2. **Put the wallpapers back.** `spacepaper reset` sets the macOS default picture
+   on every Space of every display, and needs the same hotkeys, Accessibility
+   permission, and frontmost window as `apply`. Nothing records what each Space
+   carried before `apply` ran, so to get a picture of your own back, hand it to
+   `reset --picture FILE` or choose it in System Settings. Each Space keeps an
+   assignment of its own afterward rather than following the global wallpaper
+   again — the first of the [known limitations](#known-limitations).
+
+3. **Delete the files it wrote**, all outside the repo and all listed under
+   [Nothing personal lives in this repo](#nothing-personal-lives-in-this-repo):
+
+   ```
+   rm ~/Pictures/Wallpapers/*-*-[0-9]*x[0-9]*.png   # only the rendered wallpapers
+   rm -r ~/.config/spacepaper                       # or $XDG_CONFIG_HOME/spacepaper
+   rm ~/Library/Logs/spacepaper.log
+   ```
+
+   The wallpapers directory may hold pictures of your own, so delete by pattern
+   (`word-palette-WxH.png`) rather than removing the directory. Do this after
+   step 2, so no Space is left pointing at a file that no longer exists.
+
+4. **Delete the checkout**, which holds the virtualenv and with it the `spacepaper`
+   command.
+
+5. **Undo the settings you changed for it**, if you did: Accessibility permission
+   for your terminal (System Settings → Privacy & Security → Accessibility), the
+   "Switch to Desktop N" shortcuts, and "Automatically rearrange Spaces based on
+   most recent use". The tool never touched these, and cannot tell whether you did.
 
 ## Tests
 

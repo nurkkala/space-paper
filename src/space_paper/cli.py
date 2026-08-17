@@ -1,9 +1,11 @@
 """Give every Space its own wallpaper: a word repeated in a brick-offset grid,
 each Space in its own calm hue, so the active desktop is identifiable at a glance.
+And when you switch Spaces, flash the name of the one you have just reached.
 
     spacepaper status                              # displays, Spaces, current wallpaper
     spacepaper config --init                       # record which words go where
     spacepaper apply                               # render what is missing, then set
+    spacepaper watch --install                     # flash the Space's name on switching
     spacepaper sheet                               # palette contact sheet, in a browser
     spacepaper reset                               # every Space back to the macOS default
 

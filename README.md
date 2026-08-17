@@ -25,6 +25,33 @@ running from login onward. The section
 [Flashing the Space name on switching](#flashing-the-space-name-on-switching) has
 the details.
 
+## Installing
+
+macOS only (it talks to AppKit and the window server), Python 3.11 or newer,
+[uv](https://docs.astral.sh/uv/), and headless Chrome for rendering (see
+[Requirements](#requirements)).
+
+```
+git clone https://github.com/nurkkala/space-paper.git && cd space-paper
+uv tool install .            # `spacepaper` on your PATH, in its own environment
+```
+
+`uv tool install` is the way to run it day to day, because the `watch` login
+agent records the absolute path of the `spacepaper` that ran `--install`, and
+`~/.local/bin/spacepaper` stays put where a checkout may not. After pulling
+changes, `uv tool install --reinstall .` picks them up.
+
+To hack on it, work from the checkout instead:
+
+```
+uv sync                      # the virtualenv, test dependencies included
+uv run spacepaper status
+```
+
+Under `uv run` the recorded path is the checkout's `.venv/bin/spacepaper`. If
+you switch from one way to the other, re-run `spacepaper watch --install` so
+launchd points at the binary you now use.
+
 ## Commands
 
 | Command | What it does |
@@ -314,8 +341,9 @@ fresh reading.
 `--install` records the appearance options (`--hold`, `--fade`, `--scale`, `--font`)
 into the launchd plist, so the agent flashes exactly as the command that installed
 it would have. The plist records the executable's absolute path, because launchd
-has none of your PATH or virtualenv. Move or delete the checkout and the agent
-breaks until you re-run `--install`. Output goes to
+has none of your PATH or virtualenv. Move or delete that binary (the checkout's
+`.venv/bin/spacepaper` under `uv run`) and the agent breaks until you re-run
+`--install`. Output goes to
 `~/Library/Logs/spacepaper.log`.
 
 ## Resetting
@@ -345,7 +373,7 @@ can restore. The tool wrote nothing else; it only ever reads the wallpaper store
 earlier steps need things the later ones remove.
 
 1. **Stop the watcher.** `spacepaper watch --uninstall` boots the login agent out
-   of launchd and deletes its plist. Do this step while the checkout still exists,
+   of launchd and deletes its plist. Do this step before removing the install,
    because the plist records the executable's absolute path. If that binary is
    already gone, do the equivalent by hand:
 
@@ -375,8 +403,8 @@ earlier steps need things the later ones remove.
    (`word-palette-WxH.png`) rather than removing the directory. Delete them after
    step 2; otherwise a Space is left pointing at a file that no longer exists.
 
-4. **Delete the checkout**, which holds the virtualenv and with it the `spacepaper`
-   command.
+4. **Remove the install.** `uv tool uninstall space-paper` if you installed it
+   that way; then delete the checkout, which holds the hacking virtualenv.
 
 5. **Undo the settings you changed for it**, if you did: Accessibility permission
    for your terminal (System Settings → Privacy & Security → Accessibility), the

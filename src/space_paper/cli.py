@@ -36,6 +36,7 @@ Desktop N" enabled in System Settings > Keyboard > Keyboard Shortcuts > Mission
 Control, and Accessibility permission for the terminal that runs it.
 """
 
+import importlib.metadata
 import shutil
 import subprocess
 import tempfile
@@ -257,6 +258,24 @@ sheet.replaceWith(...PALETTES.map(([name, ground, wordcolor]) => {
 """)
 
 app = typer.Typer(add_completion=False, help=__doc__)
+
+
+def show_version(value: bool) -> None:
+    if value:
+        typer.echo(f"spacepaper {importlib.metadata.version('space-paper')}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: Annotated[
+        bool,
+        typer.Option("--version", callback=show_version, is_eager=True, help="Show the version and exit."),
+    ] = False,
+) -> None:
+    # The version comes from the installed package metadata, so it is written in one
+    # place -- pyproject.toml -- and read from there by every install mode.
+    pass
 
 
 def find_chrome() -> str:

@@ -50,7 +50,8 @@ uv run spacepaper status
 
 Under `uv run` the recorded path is the checkout's `.venv/bin/spacepaper`. If
 you switch from one way to the other, re-run `spacepaper watch --install` so
-launchd points at the binary you now use.
+launchd points at the binary you now use. `spacepaper --version` says which
+release you have.
 
 ## Commands
 
